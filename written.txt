@@ -1,5 +1,35 @@
 ﻿Q3. What happens to the bounding boxes with update + fullRefit?
 
+fullRefit only recomputes the box sizes. It never changes which circles are grouped together
+in the tree. When the tree was built, each group held circles that were close to each other.
+But every circle moves in its own random direction, so circles in the same group drift apart.
+To cover them, the boxes keep growing until many of them stretch across most of the screen.
+They overlap each other a lot, and many boxes are mostly empty space. In my test, the internal
+boxes covered about 4.6x the screen area at the start. After 600 frames this grew to about
+34x, and it never shrinks back. The picture is still correct, because refit keeps every box
+around its circles. But a pixel now falls inside many big boxes, so the ray tracer has to
+visit many more nodes per pixel. The BVH loses its benefit and the frame rate drops over time.
+
 Q4. What happens with reset (rebuild every frame) instead?
 
+The tree is built again from the current positions every frame, so circles that are close
+right now are grouped together. The boxes stay small and tight with little overlap. In my test
+the total box area stayed around 4.6x-4.9x the screen for the whole run, the same as the first
+frame. The box structure jumps and changes from frame to frame, because the split choices
+change as circles move. Rebuilding costs more per frame than refitting (O(n log n) binned SAH
+build vs O(n) refit). But with 100 circles this is cheap compared to tracing about 786k pixels
+x 4 samples, so the frame rate stays high and stable instead of getting worse over time.
+So the tradeoff is this. Refit is cheaper per update, but the tree quality gets worse over
+time. Rebuild costs more per update but keeps the tree quality good.
+(In the program, press R to switch between refit and rebuild.)
+
 Q5. Why are some circles drawn with their sides cut off?
+
+The starter code picks each circle's center uniformly in [0, width] x [0, height]. It does not
+consider the radius. So a circle whose center is less than one radius from an edge sticks out
+past the window. Only the part inside the screen is traced, because we only shoot rays for
+pixels from 0..1023 and 0..767. The rest of the circle is cut off by the window border. The BVH
+itself is not the cause. I checked the BVH result against a brute-force test of all circles at
+every pixel, and they matched exactly.
+(Bonus 2 fix: centers are now picked in [r, width - r] x [r, height - r]. When circles move,
+update() bounces them off the edges, so they always stay fully on screen.)
